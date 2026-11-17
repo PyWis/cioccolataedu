@@ -1,0 +1,13 @@
+{
+  "name": "cioccolataedu",
+  "version": "2.0.0",
+  "private": true,
+  "description": "La Fabbrica del Cioccolato: gioco per imparare le frazioni",
+  "scripts": {
+    "build:css": "tailwindcss -i ./css/input.css -o ./css/styles.css --minify",
+    "watch:css": "tailwindcss -i ./css/input.css -o ./css/styles.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.19"
+  }
+}
