@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Fabbrica del Cioccolato - Impariamo le Frazioni</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Fredoka per un look giocoso e leggibile per i bambini -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti per festeggiare le risposte corrette -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Fredoka', sans-serif;
+            background: linear-gradient(135deg, #FFF5E4 0%, #FFE3E1 50%, #FFD1D1 100%);
+            min-height: 100vh;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* Stile realistico per il quadretto di cioccolato */
+        .choco-piece {
+            background: linear-gradient(145deg, #6B3E26 0%, #4A2511 100%);
+            border-radius: 12px;
+            box-shadow: 
+                inset 0 3px 4px rgba(255, 255, 255, 0.25),
+                inset 0 -4px 6px rgba(0, 0, 0, 0.4),
+                0 6px 10px rgba(74, 37, 17, 0.3);
+            position: relative;
+            cursor: grab;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+            touch-action: none; /* Fondamentale per il drag & drop su touch/LIM */
+        }
+
+        /* Rilievo interno del quadretto di cioccolato */
+        .choco-piece::before {
+            content: '';
+            position: absolute;
+            top: 14%;
+            left: 14%;
+            right: 14%;
+            bottom: 14%;
+            border-radius: 8px;
+            background: linear-gradient(145deg, #5C331D 0%, #75442A 100%);
+            box-shadow: 
+                inset 0 2px 3px rgba(0, 0, 0, 0.35),
+                0 1px 2px rgba(255, 255, 255, 0.2);
+            pointer-events: none;
+        }
+
+        /* Piccolo riflesso lucido sul cioccolato */
+        .choco-piece::after {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 20%;
+            width: 25%;
+            height: 12%;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            transform: rotate(-15deg);
+            pointer-events: none;
+        }
+
+        .choco-piece:hover {
+            transform: scale(1.06) translateY(-3px);
+            box-shadow: 
+                inset 0 3px 4px rgba(255, 255, 255, 0.3),
+                inset 0 -4px 6px rgba(0, 0, 0, 0.4),
+                0 10px 15px rgba(74, 37, 17, 0.4);
+        }
+
+        .choco-piece:active, .choco-piece.dragging {
+            cursor: grabbing;
+            transform: scale(1.12) rotate(3deg);
+            z-index: 50;
+            box-shadow: 0 15px 25px rgba(74, 37, 17, 0.5);
+        }
+
+        /* Slot vuoto nella barretta (incarto dorato/argentato) */
+        .choco-slot {
+            background: rgba(251, 191, 36, 0.15);
+            border: 3px dashed #D97706;
+            border-radius: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .choco-slot.drag-over {
+            background: rgba(251, 191, 36, 0.35);
+            transform: scale(1.03);
+        }
+
+        /* Incarto della barretta di cioccolato */
+        .choco-wrapper {
+            background: linear-gradient(180deg, #F59E0B 0%, #D97706 100%);
+            border: 4px solid #B45309;
+            box-shadow: 0 10px 25px rgba(180, 83, 9, 0.25);
+        }
+
+        /* Piatto di ceramica */
+        .ceramic-plate {
+            background: radial-gradient(circle at center, #FFFFFF 60%, #F1F5F9 62%, #E2E8F0 70%, #FFFFFF 72%, #CBD5E1 100%);
+            box-shadow: 
+                0 12px 30px rgba(15, 23, 42, 0.12),
+                inset 0 4px 10px rgba(255, 255, 255, 0.9);
+            border: 6px solid #F8FAFC;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .ceramic-plate.drag-over {
+            transform: scale(1.04);
+            border-color: #38BDF8;
+            box-shadow: 
+                0 0 0 8px rgba(56, 189, 248, 0.25),
+                0 15px 35px rgba(15, 23, 42, 0.15);
+        }
+
+        /* Animazione rimbalzo */
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .animate-pop {
+            animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+
+        .animate-shake {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        /* Bottoni stile giocattolo 3D */
+        .btn-3d {
+            transition: all 0.15s ease;
+            border-bottom-width: 6px;
+        }
+        .btn-3d:active:not(:disabled) {
+            transform: translateY(4px);
+            border-bottom-width: 2px;
+        }
+    </style>
+</head>
+<body class="text-slate-800 flex flex-col justify-between p-3 sm:p-6">
+
+    <!-- HEADER: Titolo, Punteggio e Controlli Audio/Aiuto -->
+    <header class="max-w-5xl w-full mx-auto bg-white/90 backdrop-blur-md rounded-3xl p-4 shadow-lg border-2 border-amber-200 flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-amber-800 rounded-2xl flex items-center justify-center text-2xl shadow-inner border-2 border-amber-600">
+                🍫
+            </div>
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold text-amber-950 leading-tight">La Fabbrica del Cioccolato</h1>
+                <p class="text-xs sm:text-sm text-amber-700 font-medium">Impariamo le frazioni giocando!</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-4">
+            <!-- Contatore Stelle -->
+            <div class="bg-yellow-100 border-2 border-yellow-400 px-4 py-2 rounded-2xl flex items-center gap-2 shadow-sm">
+                <span class="text-2xl animate-bounce" style="animation-duration: 2s;">⭐</span>
+                <div>
+                    <span class="text-xs text-yellow-800 font-bold uppercase block leading-none">Stelle</span>
+                    <span id="score-display" class="text-xl font-bold text-yellow-900">0</span>
+                </div>
+            </div>
+
+            <!-- Pulsante Audio -->
+            <button id="toggle-sound" onclick="toggleAudio()" title="Attiva/Disattiva Suoni" class="p-3 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-2xl border-2 border-sky-300 transition-colors cursor-pointer">
+                <span id="sound-icon" class="text-xl">🔊</span>
+            </button>
+
+            <!-- Pulsante Aiuto -->
+            <button onclick="openHelpModal()" class="btn-3d bg-purple-500 hover:bg-purple-600 text-white font-bold px-4 py-2.5 rounded-2xl border-purple-700 flex items-center gap-2 cursor-pointer shadow-md">
+                <span class="text-lg">💡</span>
+                <span class="hidden sm:inline">Come funziona?</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT: Area di gioco -->
+    <main class="max-w-5xl w-full mx-auto flex-grow flex flex-col gap-6">
+
+        <!-- SEZIONE SUPERIORE: Obiettivo e Frazione -->
+        <section class="bg-white/95 rounded-3xl p-5 sm:p-6 shadow-xl border-4 border-amber-300 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div class="text-center md:text-left flex-1">
+                <span class="inline-block bg-amber-100 text-amber-800 text-xs sm:text-sm font-bold px-3 py-1 rounded-full mb-2 uppercase tracking-wider">
+                    Missione Cioccolatosa
+                </span>
+                <h2 class="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">
+                    Prepara la frazione nel piatto!
+                </h2>
+                <p class="text-slate-600 text-base sm:text-lg">
+                    Trascina i quadretti di cioccolato dalla barretta fino al piatto. 
+                    <span class="block text-sm text-amber-700 mt-1 font-medium">💡 Puoi anche riportare i quadretti indietro se cambi idea!</span>
+                </p>
+            </div>
+
+            <!-- BOX FRAZIONE GIGANTE -->
+            <div class="flex items-center gap-4 bg-gradient-to-br from-sky-50 to-indigo-50 p-4 sm:p-5 rounded-3xl border-4 border-sky-300 shadow-inner">
+                <div class="text-right hidden sm:block">
+                    <div class="text-xs font-bold text-rose-600 uppercase">Numeratore ➔</div>
+                    <div class="text-[11px] text-slate-500 mb-3">(quanti ne prendi)</div>
+                    <div class="text-xs font-bold text-emerald-600 uppercase">Denominatore ➔</div>
+                    <div class="text-[11px] text-slate-500">(quadretti totali)</div>
+                </div>
+
+                <!-- La frazione vera e propria -->
+                <div class="bg-white px-7 py-3 rounded-2xl shadow-md border-2 border-sky-200 flex flex-col items-center justify-center min-w-[100px]">
+                    <span id="target-numerator" class="text-4xl sm:text-5xl font-extrabold text-rose-500 leading-none">3</span>
+                    <div class="w-14 h-1.5 bg-slate-800 rounded-full my-2"></div>
+                    <span id="target-denominator" class="text-4xl sm:text-5xl font-extrabold text-emerald-600 leading-none">4</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- AREA INTERATTIVA: Barretta di Cioccolato & Piatto -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+            
+            <!-- SINISTRA: La Barretta di Cioccolato -->
+            <div class="bg-white/90 rounded-3xl p-5 sm:p-6 shadow-lg border-2 border-amber-200 flex flex-col items-center justify-between">
+                <div class="w-full flex items-center justify-between mb-4">
+                    <h3 class="text-lg sm:text-xl font-bold text-amber-900 flex items-center gap-2">
+                        <span>🍫</span> La tua Barretta
+                    </h3>
+                    <span id="bar-counter" class="bg-amber-100 text-amber-900 text-sm font-bold px-3 py-1 rounded-full">
+                        Divisa in 4 parti
+                    </span>
+                </div>
+
+                <!-- Incarto e Griglia dei Quadretti -->
+                <div id="chocolate-bar-wrapper" class="choco-wrapper w-full max-w-md p-4 sm:p-6 rounded-3xl my-auto transition-all">
+                    <div id="chocolate-bar-grid" class="grid gap-3 justify-items-center items-center min-h-[160px]">
+                        <!-- I quadretti vengono generati via JS -->
+                    </div>
+                </div>
+
+                <p class="text-xs sm:text-sm text-slate-500 mt-4 text-center font-medium">
+                    Trascina un quadretto verso il piatto (o cliccalo per spostarlo velocemente)
+                </p>
+            </div>
+
+            <!-- DESTRA: Il Piatto di Destinazione -->
+            <div class="bg-white/90 rounded-3xl p-5 sm:p-6 shadow-lg border-2 border-sky-200 flex flex-col items-center justify-between">
+                <div class="w-full flex items-center justify-between mb-4">
+                    <h3 class="text-lg sm:text-xl font-bold text-sky-900 flex items-center gap-2">
+                        <span>🍽️</span> Il tuo Piatto
+                    </h3>
+                    <span id="plate-counter" class="bg-sky-100 text-sky-900 text-sm font-bold px-3 py-1 rounded-full">
+                        Quadretti nel piatto: 0
+                    </span>
+                </div>
+
+                <!-- Area Drop Zone Piatto -->
+                <div id="plate-dropzone" class="ceramic-plate w-full max-w-[340px] aspect-square rounded-full p-8 flex flex-wrap content-center justify-center gap-3 my-auto relative">
+                    <div id="plate-placeholder" class="text-center text-slate-400 pointer-events-none select-none px-4">
+                        <span class="text-4xl block mb-2 opacity-60">👇</span>
+                        <span class="text-sm sm:text-base font-semibold">Trascina qui i quadretti di cioccolato!</span>
+                    </div>
+                    <!-- I quadretti trascinati finiscono qui -->
+                </div>
+
+                <p class="text-xs sm:text-sm text-slate-500 mt-4 text-center font-medium">
+                    Controlla che il numero di quadretti corrisponda al <span class="text-rose-500 font-bold">numeratore</span>!
+                </p>
+            </div>
+
+        </section>
+
+        <!-- AREA FEEDBACK E CONTROLLI -->
+        <section class="bg-white/95 rounded-3xl p-5 shadow-xl border-2 border-slate-200 flex flex-col items-center gap-4">
+            
+            <!-- Box Messaggio di Feedback -->
+            <div id="feedback-box" class="hidden w-full max-w-2xl rounded-2xl p-4 text-center border-2 transition-all animate-pop">
+                <p id="feedback-title" class="text-xl sm:text-2xl font-bold mb-1"></p>
+                <p id="feedback-message" class="text-sm sm:text-base font-medium"></p>
+            </div>
+
+            <!-- Bottoni Azione -->
+            <div class="flex flex-wrap items-center justify-center gap-4 w-full">
+                <button id="btn-reset" onclick="resetCurrentBar()" class="btn-3d bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-lg px-6 py-3.5 rounded-2xl border-slate-400 flex items-center gap-2 cursor-pointer">
+                    <span>🔄</span>
+                    <span>Ricomincia</span>
+                </button>
+
+                <button id="btn-check" onclick="checkAnswer()" class="btn-3d bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-lg sm:text-xl px-8 py-3.5 rounded-2xl border-emerald-700 flex items-center gap-2 shadow-lg cursor-pointer">
+                    <span>✅</span>
+                    <span>Controlla</span>
+                </button>
+
+                <button id="btn-next" onclick="nextFraction()" class="hidden btn-3d bg-amber-500 hover:bg-amber-600 text-white font-bold text-lg sm:text-xl px-8 py-3.5 rounded-2xl border-amber-700 flex items-center gap-2 shadow-lg cursor-pointer animate-pop">
+                    <span>Prossima Frazione</span>
+                    <span>➡️</span>
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="max-w-5xl w-full mx-auto text-center text-xs sm:text-sm text-amber-900/70 mt-6 font-medium">
+        Creato con ❤️ per piccoli matematici golosi • Frazioni proprie con denominatore fino a 9
+    </footer>
+
+    <!-- MODALE AIUTO: Come funzionano le frazioni -->
+    <div id="help-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border-4 border-purple-300 animate-pop relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeHelpModal()" class="absolute top-4 right-4 w-10 h-10 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center text-slate-600 font-bold text-xl cursor-pointer">
+                ✕
+            </button>
+
+            <div class="text-center mb-6">
+                <span class="text-5xl block mb-2">🍫🎓</span>
+                <h3 class="text-2xl sm:text-3xl font-bold text-purple-900">Come si leggono le frazioni?</h3>
+                <p class="text-slate-600 mt-1">È facilissimo con una barretta di cioccolato!</p>
+            </div>
+
+            <!-- Esempio visivo -->
+            <div class="bg-purple-50 rounded-2xl p-5 border-2 border-purple-200 mb-6 flex items-center justify-center gap-6">
+                <div class="bg-white px-6 py-3 rounded-2xl shadow-sm border-2 border-purple-200 flex flex-col items-center">
+                    <span class="text-4xl font-extrabold text-rose-500">3</span>
+                    <div class="w-12 h-1.5 bg-slate-800 rounded-full my-1.5"></div>
+                    <span class="text-4xl font-extrabold text-emerald-600">4</span>
+                </div>
+                <div class="text-sm sm:text-base text-slate-700 space-y-2">
+                    <p><strong class="text-rose-500">3 (Numeratore):</strong> È il numero in alto. Ti dice <u>quanti quadretti</u> devi prendere e mettere nel piatto.</p>
+                    <p><strong class="text-emerald-600">4 (Denominatore):</strong> È il numero in basso. Ti dice <u>in quante parti uguali</u> è divisa tutta la barretta.</p>
+                </div>
+            </div>
+
+            <div class="bg-amber-50 rounded-2xl p-4 border-2 border-amber-200 text-sm text-amber-900 mb-6">
+                <strong>💡 Trucco del mestiere:</strong><br>
+                Puoi trascinare i quadretti con il dito o con il mouse, oppure fare un semplice <strong>clic/tocco</strong> sopra un quadretto per spostarlo subito dalla barretta al piatto (e viceversa)!
+            </div>
+
+            <button onclick="closeHelpModal()" class="w-full btn-3d bg-purple-600 hover:bg-purple-700 text-white font-bold text-lg py-3 rounded-2xl border-purple-800 cursor-pointer">
+                Ho capito, giochiamo! 🚀
+            </button>
+        </div>
+    </div>
+
+    <!-- ELEMENTO FANTASMA PER DRAG TOUCH/MOUSE PERSONALIZZATO -->
+    <div id="drag-ghost" class="fixed pointer-events-none z-50 hidden choco-piece w-16 h-16 opacity-90 shadow-2xl"></div>
+
+    <script>
+        // ==========================================
+        // STATO DELL'APPLICAZIONE
+        // ==========================================
+        let currentNumerator = 3;
+        let currentDenominator = 4;
+        let score = 0;
+        let soundEnabled = true;
+        let isSolved = false;
+
+        // Tracciamento dei quadretti: array di oggetti { id: number, location: 'bar' | 'plate' }
+        let pieces = [];
+
+        // Riferimenti DOM
+        const targetNumEl = document.getElementById('target-numerator');
+        const targetDenEl = document.getElementById('target-denominator');
+        const barGridEl = document.getElementById('chocolate-bar-grid');
+        const plateZoneEl = document.getElementById('plate-dropzone');
+        const platePlaceholderEl = document.getElementById('plate-placeholder');
+        const barCounterEl = document.getElementById('bar-counter');
+        const plateCounterEl = document.getElementById('plate-counter');
+        const scoreDisplayEl = document.getElementById('score-display');
+        const feedbackBoxEl = document.getElementById('feedback-box');
+        const feedbackTitleEl = document.getElementById('feedback-title');
+        const feedbackMsgEl = document.getElementById('feedback-message');
+        const btnCheckEl = document.getElementById('btn-check');
+        const btnNextEl = document.getElementById('btn-next');
+        const btnResetEl = document.getElementById('btn-reset');
+        const dragGhostEl = document.getElementById('drag-ghost');
+
+        // ==========================================
+        // SISTEMA AUDIO (Web Audio API - Nessun file esterno)
+        // ==========================================
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function toggleAudio() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-icon').textContent = soundEnabled ? '🔊' : '🔇';
+            if (soundEnabled) {
+                initAudio();
+                playPopSound();
+            }
+        }
+
+        // Suono "Pop" quando si sposta un quadretto
+        function playPopSound() {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(580, audioCtx.currentTime + 0.08);
+                
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.09);
+            } catch (e) { console.log(e); }
+        }
+
+        // Suono di vittoria (arpeggio allegro)
+        function playWinSound() {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // Do5, Mi5, Sol5, Do6
+                notes.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    const startTime = audioCtx.currentTime + idx * 0.1;
+                    osc.frequency.setValueAtTime(freq, startTime);
+                    
+                    gain.gain.setValueAtTime(0.25, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.31);
+                });
+            } catch (e) { console.log(e); }
+        }
+
+        // Suono gentile di errore
+        function playErrorSound() {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(280, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(210, audioCtx.currentTime + 0.25);
+                
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.26);
+            } catch (e) { console.log(e); }
+        }
+
+        // ==========================================
+        // GENERAZIONE FRAZIONE E RENDERING
+        // ==========================================
+        let lastFractionKey = "";
+
+        function generateFraction() {
+            let num, den, key;
+            // Evita di ripetere esattamente la stessa frazione due volte di fila
+            do {
+                // Denominatore tra 2 e 9
+                den = Math.floor(Math.random() * 8) + 2; 
+                // Numeratore strettamente minore del denominatore (tra 1 e den - 1)
+                num = Math.floor(Math.random() * (den - 1)) + 1;
+                key = `${num}/${den}`;
+            } while (key === lastFractionKey);
+
+            lastFractionKey = key;
+            currentNumerator = num;
+            currentDenominator = den;
+            isSolved = false;
+
+            // Inizializza tutti i quadretti nella barretta
+            pieces = [];
+            for (let i = 0; i < currentDenominator; i++) {
+                pieces.push({ id: i, location: 'bar' });
+            }
+
+            // Aggiorna UI
+            targetNumEl.textContent = currentNumerator;
+            targetDenEl.textContent = currentDenominator;
+            barCounterEl.textContent = `Divisa in ${currentDenominator} ${currentDenominator === 1 ? 'parte' : 'parti'}`;
+            
+            hideFeedback();
+            btnCheckEl.classList.remove('hidden');
+            btnResetEl.classList.remove('hidden');
+            btnNextEl.classList.add('hidden');
+
+            renderBoard();
+        }
+
+        function resetCurrentBar() {
+            if (isSolved) return;
+            pieces.forEach(p => p.location = 'bar');
+            hideFeedback();
+            playPopSound();
+            renderBoard();
+        }
+
+        function nextFraction() {
+            playPopSound();
+            generateFraction();
+        }
+
+        // Calcola il layout migliore della griglia per la barretta di cioccolato
+        function getGridColumnsClass(den) {
+            if (den <= 3) return 'grid-cols-' + den;
+            if (den === 4) return 'grid-cols-2';
+            if (den === 5) return 'grid-cols-3';
+            if (den === 6) return 'grid-cols-3';
+            if (den === 7) return 'grid-cols-4';
+            if (den === 8) return 'grid-cols-4';
+            if (den === 9) return 'grid-cols-3';
+            return 'grid-cols-3';
+        }
+
+        function renderBoard() {
+            // 1. Renderizza la Barretta
+            barGridEl.innerHTML = '';
+            barGridEl.className = `grid gap-3 justify-items-center items-center min-h-[160px] ${getGridColumnsClass(currentDenominator)}`;
+
+            pieces.forEach(piece => {
+                const slot = document.createElement('div');
+                slot.className = 'choco-slot w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center';
+                slot.dataset.slotId = piece.id;
+
+                if (piece.location === 'bar') {
+                    const choco = createChocoElement(piece.id);
+                    slot.appendChild(choco);
+                }
+
+                barGridEl.appendChild(slot);
+            });
+
+            // 2. Renderizza il Piatto
+            // Rimuovi solo i quadretti esistenti nel piatto, lasciando il placeholder
+            const existingChocos = plateZoneEl.querySelectorAll('.choco-piece');
+            existingChocos.forEach(el => el.remove());
+
+            const platePieces = pieces.filter(p => p.location === 'plate');
+            
+            if (platePieces.length === 0) {
+                platePlaceholderEl.classList.remove('hidden');
+            } else {
+                platePlaceholderEl.classList.add('hidden');
+                platePieces.forEach(piece => {
+                    const choco = createChocoElement(piece.id);
+                    choco.classList.add('animate-pop');
+                    plateZoneEl.appendChild(choco);
+                });
+            }
+
+            // Aggiorna contatore piatto
+            plateCounterEl.textContent = `Quadretti nel piatto: ${platePieces.length}`;
+        }
+
+        function createChocoElement(id) {
+            const div = document.createElement('div');
+            div.className = 'choco-piece w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center';
+            div.dataset.id = id;
+
+            // Eventi Pointer (unifica Mouse e Touch su Tablet/LIM!)
+            div.addEventListener('pointerdown', handlePointerDown);
+
+            return div;
+        }
+
+        // ==========================================
+        // SISTEMA DRAG & DROP UNIFICATO (MOUSE + TOUCH + CLICK RAPIDO)
+        // ==========================================
+        let draggedPieceId = null;
+        let startX = 0;
+        let startY = 0;
+        let isDragging = false;
+        let draggedElementRef = null;
+
+        function handlePointerDown(e) {
+            if (isSolved) return;
+            // Evita tasto destro
+            if (e.button !== undefined && e.button !== 0) return;
+
+            e.preventDefault();
+            const target = e.currentTarget;
+            draggedPieceId = parseInt(target.dataset.id, 10);
+            draggedElementRef = target;
+            startX = e.clientX;
+            startY = e.clientY;
+            isDragging = false;
+
+            // Cattura i movimenti su tutta la finestra
+            window.addEventListener('pointermove', handlePointerMove);
+            window.addEventListener('pointerup', handlePointerUp);
+            window.addEventListener('pointercancel', handlePointerUp);
+        }
+
+        function handlePointerMove(e) {
+            if (draggedPieceId === null) return;
+
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            // Inizia il trascinamento visivo solo dopo un piccolo movimento (6px) per distinguere dal click
+            if (!isDragging && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+                isDragging = true;
+                if (draggedElementRef) {
+                    draggedElementRef.style.opacity = '0.3';
+                }
+                dragGhostEl.classList.remove('hidden');
+            }
+
+            if (isDragging) {
+                // Posiziona l'elemento fantasma sotto il dito/cursore
+                dragGhostEl.style.left = `${e.clientX - 32}px`;
+                dragGhostEl.style.top = `${e.clientY - 32}px`;
+
+                // Evidenzia l'area di rilascio (Piatto o Barretta)
+                checkDropTargetsHover(e.clientX, e.clientY);
+            }
+        }
+
+        function checkDropTargetsHover(x, y) {
+            const plateRect = plateZoneEl.getBoundingClientRect();
+            const barRect = document.getElementById('chocolate-bar-wrapper').getBoundingClientRect();
+
+            const overPlate = (x >= plateRect.left && x <= plateRect.right && y >= plateRect.top && y <= plateRect.bottom);
+            const overBar = (x >= barRect.left && x <= barRect.right && y >= barRect.top && y <= barRect.bottom);
+
+            if (overPlate) {
+                plateZoneEl.classList.add('drag-over');
+            } else {
+                plateZoneEl.classList.remove('drag-over');
+            }
+
+            if (overBar) {
+                document.getElementById('chocolate-bar-wrapper').classList.add('ring-4', 'ring-amber-300');
+            } else {
+                document.getElementById('chocolate-bar-wrapper').classList.remove('ring-4', 'ring-amber-300');
+            }
+        }
+
+        function handlePointerUp(e) {
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+            window.removeEventListener('pointercancel', handlePointerUp);
+
+            plateZoneEl.classList.remove('drag-over');
+            document.getElementById('chocolate-bar-wrapper').classList.remove('ring-4', 'ring-amber-300');
+            dragGhostEl.classList.add('hidden');
+
+            if (draggedPieceId === null) return;
+
+            const piece = pieces.find(p => p.id === draggedPieceId);
+            if (!piece) return;
+
+            if (!isDragging) {
+                // È stato un semplice CLIC / TOCCO: sposta automaticamente il quadretto dall'altra parte!
+                piece.location = piece.location === 'bar' ? 'plate' : 'bar';
+                playPopSound();
+                hideFeedback();
+            } else {
+                // È stato un TRASCINAMENTO: controlla dove è stato rilasciato
+                const x = e.clientX;
+                const y = e.clientY;
+                const plateRect = plateZoneEl.getBoundingClientRect();
+                const barRect = document.getElementById('chocolate-bar-wrapper').getBoundingClientRect();
+
+                const overPlate = (x >= plateRect.left && x <= plateRect.right && y >= plateRect.top && y <= plateRect.bottom);
+                const overBar = (x >= barRect.left && x <= barRect.right && y >= barRect.top && y <= barRect.bottom);
+
+                if (overPlate && piece.location !== 'plate') {
+                    piece.location = 'plate';
+                    playPopSound();
+                    hideFeedback();
+                } else if (overBar && piece.location !== 'bar') {
+                    piece.location = 'bar';
+                    playPopSound();
+                    hideFeedback();
+                }
+            }
+
+            draggedPieceId = null;
+            draggedElementRef = null;
+            isDragging = false;
+            renderBoard();
+        }
+
+        // ==========================================
+        // VERIFICA DELLA RISPOSTA E FEEDBACK
+        // ==========================================
+        function checkAnswer() {
+            if (isSolved) return;
+
+            const plateCount = pieces.filter(p => p.location === 'plate').length;
+
+            if (plateCount === currentNumerator) {
+                // RISPOSTA ESATTA!
+                isSolved = true;
+                score += 1;
+                scoreDisplayEl.textContent = score;
+                
+                playWinSound();
+                launchConfetti();
+
+                showFeedback(
+                    'success',
+                    '🎉 Ottimo lavoro! Fantastico!',
+                    `Hai preparato esattamente ${currentNumerator}/${currentDenominator} della barretta di cioccolato! Hai guadagnato una stella!`
+                );
+
+                btnCheckEl.classList.add('hidden');
+                btnResetEl.classList.add('hidden');
+                btnNextEl.classList.remove('hidden');
+
+            } else if (plateCount === 0) {
+                // PIATTO VUOTO
+                playErrorSound();
+                plateZoneEl.classList.add('animate-shake');
+                setTimeout(() => plateZoneEl.classList.remove('animate-shake'), 450);
+
+                showFeedback(
+                    'warning',
+                    '🍽️ Il piatto è ancora vuoto!',
+                    `Trascina ${currentNumerator} ${currentNumerator === 1 ? 'quadretto' : 'quadretti'} di cioccolato dalla barretta al piatto.`
+                );
+
+            } else if (plateCount < currentNumerator) {
+                // TROPPO POCHI
+                playErrorSound();
+                plateZoneEl.classList.add('animate-shake');
+                setTimeout(() => plateZoneEl.classList.remove('animate-shake'), 450);
+
+                const missing = currentNumerator - plateCount;
+                showFeedback(
+                    'warning',
+                    '🤔 Manca ancora qualche quadretto!',
+                    `Hai messo ${plateCount} ${plateCount === 1 ? 'quadretto' : 'quadretti'}, ma il numeratore (il numero in alto) ti chiede di prenderne ${currentNumerator}. Aggiungine ancora ${missing}!`
+                );
+
+            } else {
+                // TROPPI QUADRETTI
+                playErrorSound();
+                plateZoneEl.classList.add('animate-shake');
+                setTimeout(() => plateZoneEl.classList.remove('animate-shake'), 450);
+
+                const extra = plateCount - currentNumerator;
+                showFeedback(
+                    'warning',
+                    '😅 Ops! Hai messo troppi quadretti!',
+                    `Nel piatto ci sono ${plateCount} quadretti, ma ne servono solo ${currentNumerator}. Riporta ${extra} ${extra === 1 ? 'quadretto' : 'quadretti'} nella barretta!`
+                );
+            }
+        }
+
+        function showFeedback(type, title, message) {
+            feedbackBoxEl.classList.remove('hidden', 'bg-emerald-100', 'border-emerald-400', 'text-emerald-900', 'bg-amber-100', 'border-amber-400', 'text-amber-900');
+            
+            if (type === 'success') {
+                feedbackBoxEl.classList.add('bg-emerald-100', 'border-emerald-400', 'text-emerald-900');
+            } else {
+                feedbackBoxEl.classList.add('bg-amber-100', 'border-amber-400', 'text-amber-900');
+            }
+
+            feedbackTitleEl.textContent = title;
+            feedbackMsgEl.textContent = message;
+        }
+
+        function hideFeedback() {
+            feedbackBoxEl.classList.add('hidden');
+        }
+
+        function launchConfetti() {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 90,
+                    spread: 75,
+                    origin: { y: 0.6 },
+                    colors: ['#F59E0B', '#10B981', '#EC4899', '#3B82F6', '#8B5CF6']
+                });
+            }
+        }
+
+        // ==========================================
+        // MODALE AIUTO
+        // ==========================================
+        function openHelpModal() {
+            playPopSound();
+            const modal = document.getElementById('help-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeHelpModal() {
+            playPopSound();
+            const modal = document.getElementById('help-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // Avvio iniziale al caricamento della pagina
+        window.onload = function() {
+            generateFraction();
+        };
+    </script>
+</body>
+</html>
